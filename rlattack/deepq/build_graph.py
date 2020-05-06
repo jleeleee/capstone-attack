@@ -69,6 +69,7 @@ The functions in this file can are used to create the following functions:
 """
 import tensorflow as tf
 import rlattack.common.tf_util as U
+from rlattack.str_attack import StrAttackL2
 #V: Cleverhans imports#
 from cleverhans.attacks import FastGradientMethod, BasicIterativeMethod, CarliniWagnerL2
 from cleverhans.model import CallableModelWrapper
@@ -103,7 +104,7 @@ def build_act_enjoy (make_obs_ph, q_func, num_actions, noisy=False, scope="deepq
                          outputs=q_values,
                          givens={update_eps_ph: -1.0, stochastic_ph: True},
                          updates=[update_eps_expr])
-
+                         
         # Load model before attacks graph construction so that TF won't
         # complain can't load parameters for attack
         try:
@@ -136,6 +137,15 @@ def build_act_enjoy (make_obs_ph, q_func, num_actions, noisy=False, scope="deepq
                              'clip_min': 0,
                              'clip_max': 1.0}
                 adv_observations = adversary.generate(observations_ph.get(), **cw_params) * 255.0
+            elif attack == 'strattack':
+                def wrapper(x):
+                    return q_func(x, num_actions, scope="q_func", reuse=True)
+                adversary = StrAttackL2(CallableModelWrapper(wrapper, 'logits'), sess=U.get_session())
+                str_params = {'binary_search_steps': 1,
+                             'max_iterations': 100,
+                             'learning_rate': 0.1,
+                             'initial_const': 10}
+                adv_observations = adversary.generate(observations_ph.get(), **str_params) * 255.0
 
             craft_adv_obs = U.function(inputs=[observations_ph, stochastic_ph, update_eps_ph],
                             outputs=adv_observations,
@@ -148,7 +158,7 @@ def build_act_enjoy (make_obs_ph, q_func, num_actions, noisy=False, scope="deepq
         else:
             return act, craft_adv_obs
 
-def build_adv(make_obs_tf, q_func, num_actions, epsilon, noisy):
+def build_adv(make_obs_tf, q_func, num_actions, epsilon, noisy, attack='fgsm'):
     with tf.variable_scope('deepq', reuse=tf.AUTO_REUSE):
         obs_tf_in = U.ensure_tf_input(make_obs_tf("observation"))
         stochastic_ph_adv = tf.placeholder(tf.bool, (), name="stochastic_adv")
@@ -159,8 +169,55 @@ def build_adv(make_obs_tf, q_func, num_actions, epsilon, noisy):
 
         #def wrapper(x):
         #    return q_func(x, num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy)
-        adversary = FastGradientMethod(q_func(obs_tf_in.get(), num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy), sess=U.get_session())
-        adv_observations = adversary.generate(obs_tf_in.get(), eps=epsilon, clip_min=0, clip_max=1.0) * 255.0
+        #adversary = FastGradientMethod(q_func(obs_tf_in.get(), num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy), sess=U.get_session())
+        #adv_observations = adversary.generate(obs_tf_in.get(), eps=epsilon, clip_min=0, clip_max=1.0) * 255.0
+
+        if attack == None or attack == 'fgsm':
+            def wrapper(x):
+                return q_func(x, num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy)
+            #adversary = FastGradientMethod(CallableModelWrapper(wrapper, 'probs'), sess=U.get_session())
+            adversary = FastGradientMethod(q_func(obs_tf_in.get(), num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy), sess=U.get_session())
+            adv_observations = adversary.generate(obs_tf_in.get(), eps=epsilon,
+                                                  clip_min=0, clip_max=1.0) * 255.0
+        elif attack == 'iterative':
+            def wrapper(x):
+                return q_func(x, num_actions, scope="q_func", reuse=True, concat_softmax=True)
+            #adversary = BasicIterativeMethod(CallableModelWrapper(wrapper, 'probs'), sess=U.get_session())
+            adversary = BasicIterativeMethod(q_func(obs_tf_in.get(), num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy), sess=U.get_session())
+            adv_observations = adversary.generate(obs_tf_in.get(), eps=epsilon,
+                                                  clip_min=0, clip_max=1.0) * 255.0
+        elif attack == 'cwl2':
+            def wrapper(x):
+                return q_func(x, num_actions, scope="q_func", reuse=True)
+            #adversary = CarliniWagnerL2(CallableModelWrapper(wrapper, 'logits'), sess=U.get_session())
+            adversary = CarliniWagnerL2(q_func(obs_tf_in.get(), num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy), sess=U.get_session())
+            cw_params = {'binary_search_steps': 1,
+                         'max_iterations': 100,
+                         'learning_rate': 0.1,
+                         'initial_const': 10,
+                         'clip_min': 0,
+                         'clip_max': 1.0}
+            adv_observations = adversary.generate(obs_tf_in.get(), **cw_params) * 255.0
+        elif attack == 'strattack':
+            def wrapper(x):
+                return q_func(x, num_actions, scope="q_func", reuse=True)
+            #adversary = StrAttackL2(CallableModelWrapper(wrapper, 'logits'), sess=U.get_session())
+            adversary = StrAttackL2(q_func(obs_tf_in.get(), num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy), sess=U.get_session())
+            str_params = {'binary_search_steps': 1,
+                         'max_iterations': 100,
+                         'learning_rate': 0.1,
+                         'initial_const': 10,
+                         'clip_min': 0,
+                         'clip_max': 1.0,
+                         'image_size': 84,
+                         'stride': 2,
+                         'filter_size': 2,
+                         'num_channels': 1}
+            adv_observations = adversary.generate(obs_tf_in.get(), **str_params) * 255.0
+        else:
+            print("Unknown attack specified")
+            pass
+
         craft_adv_obs = U.function(inputs=[obs_tf_in, stochastic_ph_adv, update_eps_ph_adv],
                         outputs=adv_observations,
                         givens={update_eps_ph_adv: -1.0, stochastic_ph_adv: True},
@@ -375,6 +432,15 @@ def build_train(make_obs_ph, q_func, num_actions, optimizer, grad_norm_clipping=
                              'clip_min': 0,
                              'clip_max': 1.0}
                 adv_observations = adversary.generate(observations_ph.get(), **cw_params) * 255.0
+            elif attack == 'strattack':
+                def wrapper(x):
+                    return q_func(x, num_actions, scope="q_func", reuse=True)
+                adversary = StrAttackL2(CallableModelWrapper(wrapper, 'logits'), sess=U.get_session())
+                str_params = {'binary_search_steps': 1,
+                             'max_iterations': 100,
+                             'learning_rate': 0.1,
+                             'initial_const': 10}
+                adv_observations = adversary.generate(observations_ph.get(), **str_params) * 255.0
 
             craft_adv_obs = U.function(inputs=[obs_tp1_input],
                             outputs=adv_observations,                       
