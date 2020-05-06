@@ -1,0 +1,135 @@
+Logging to ./data/Breakout/
+------------------------------------
+| % completion          | 0.1      |
+| episodes              | 0        |
+| exploration           | 0.087    |
+| iters                 | 23       |
+| reward (100 epi mean) | nan      |
+| steps                 | 104      |
+------------------------------------
+
+ETA: less than a minute
+
+------------------------------------
+| % completion          | 0.3      |
+| episodes              | 0        |
+| exploration           | 0.01     |
+| iters                 | 121      |
+| reward (100 epi mean) | nan      |
+| steps                 | 522      |
+------------------------------------
+
+ETA: less than a minute
+
+------------------------------------
+| % completion          | 0.3      |
+| episodes              | 0        |
+| exploration           | 0.01     |
+| iters                 | 144      |
+| reward (100 epi mean) | nan      |
+| steps                 | 649      |
+------------------------------------
+
+ETA: less than a minute
+
+------------------------------------
+| % completion          | 0.5      |
+| episodes              | 0        |
+| exploration           | 0.01     |
+| iters                 | 215      |
+| reward (100 epi mean) | nan      |
+| steps                 | 956      |
+------------------------------------
+
+ETA: less than a minute
+
+------------------------------------
+| % completion          | 0.5      |
+| episodes              | 1        |
+| exploration           | 0.01     |
+| iters                 | 238      |
+| reward (100 epi mean) | 3        |
+| steps                 | 1065     |
+------------------------------------
+
+ETA: less than a minute
+
+------------------------------------
+| % completion          | 0.6      |
+| episodes              | 1        |
+| exploration           | 0.01     |
+| iters                 | 261      |
+| reward (100 epi mean) | 3        |
+| steps                 | 1170     |
+------------------------------------
+
+ETA: less than a minute
+
+------------------------------------
+| % completion          | 0.6      |
+| episodes              | 1        |
+| exploration           | 0.01     |
+| iters                 | 284      |
+| reward (100 epi mean) | 3        |
+| steps                 | 1297     |
+------------------------------------
+
+ETA: less than a minute
+
+------------------------------------
+| % completion          | 0.7      |
+| episodes              | 1        |
+| exploration           | 0.01     |
+| iters                 | 307      |
+| reward (100 epi mean) | 3        |
+| steps                 | 1416     |
+------------------------------------
+
+ETA: less than a minute
+
+------------------------------------
+| % completion          | 0.8      |
+| episodes              | 1        |
+| exploration           | 0.01     |
+| iters                 | 330      |
+| reward (100 epi mean) | 3        |
+| steps                 | 1521     |
+------------------------------------
+
+ETA: less than a minute
+
+------------------------------------
+| % completion          | 0.8      |
+| episodes              | 2        |
+| exploration           | 0.01     |
+| iters                 | 353      |
+| reward (100 epi mean) | 1.5      |
+| steps                 | 1645     |
+------------------------------------
+
+ETA: less than a minute
+
+------------------------------------
+| % completion          | 0.9      |
+| episodes              | 2        |
+| exploration           | 0.01     |
+| iters                 | 376      |
+| reward (100 epi mean) | 1.5      |
+| steps                 | 1761     |
+------------------------------------
+
+ETA: less than a minute
+
+------------------------------------
+| % completion          | 0.9      |
+| episodes              | 2        |
+| exploration           | 0.01     |
+| iters                 | 399      |
+| reward (100 epi mean) | 1.5      |
+| steps                 | 1882     |
+------------------------------------
+
+ETA: less than a minute
+
+Saved model in 0.31832218170166016 seconds
+

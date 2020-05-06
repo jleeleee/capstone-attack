@@ -1,0 +1,12 @@
+{"% completion": 0.1, "steps": 104, "iters": 23, "episodes": 0, "reward (100 epi mean)": NaN, "exploration": 0.08700000000000001}
+{"% completion": 0.3, "steps": 522, "iters": 121, "episodes": 0, "reward (100 epi mean)": NaN, "exploration": 0.01}
+{"% completion": 0.3, "steps": 649, "iters": 144, "episodes": 0, "reward (100 epi mean)": NaN, "exploration": 0.01}
+{"% completion": 0.5, "steps": 956, "iters": 215, "episodes": 0, "reward (100 epi mean)": NaN, "exploration": 0.01}
+{"% completion": 0.5, "steps": 1065, "iters": 238, "episodes": 1, "reward (100 epi mean)": 3.0, "exploration": 0.01}
+{"% completion": 0.6, "steps": 1170, "iters": 261, "episodes": 1, "reward (100 epi mean)": 3.0, "exploration": 0.01}
+{"% completion": 0.6, "steps": 1297, "iters": 284, "episodes": 1, "reward (100 epi mean)": 3.0, "exploration": 0.01}
+{"% completion": 0.7, "steps": 1416, "iters": 307, "episodes": 1, "reward (100 epi mean)": 3.0, "exploration": 0.01}
+{"% completion": 0.8, "steps": 1521, "iters": 330, "episodes": 1, "reward (100 epi mean)": 3.0, "exploration": 0.01}
+{"% completion": 0.8, "steps": 1645, "iters": 353, "episodes": 2, "reward (100 epi mean)": 1.5, "exploration": 0.01}
+{"% completion": 0.9, "steps": 1761, "iters": 376, "episodes": 2, "reward (100 epi mean)": 1.5, "exploration": 0.01}
+{"% completion": 0.9, "steps": 1882, "iters": 399, "episodes": 2, "reward (100 epi mean)": 1.5, "exploration": 0.01}

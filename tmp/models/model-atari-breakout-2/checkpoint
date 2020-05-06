@@ -1,0 +1,2 @@
+model_checkpoint_path: "/tmp/savedir/model-49236554/saved"
+all_model_checkpoint_paths: "/tmp/savedir/model-49236554/saved"
