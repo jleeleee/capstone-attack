@@ -1,6 +1,0 @@
-[submodule "rl-baselines-zoo"]
-	path = rl-baselines-zoo
-	url = https://github.com/araffin/rl-baselines-zoo
-[submodule "rl-attack"]
-	path = rl-attack
-	url = https://github.com/behzadanksu/rl-attack
