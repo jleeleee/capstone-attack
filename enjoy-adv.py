@@ -125,10 +125,22 @@ def make_env(game_name):
         env = wrap_dqn(env)
         return env
 
+def img_stats(img):
+    print("Image max: " + str(np.max(np.max(img, axis=1), axis=1)))
+    print("Image min: " + str(np.min(np.min(img, axis=1), axis=1)))
+
+
+def perturbation_stats(adv, scale=1.0):
+    tmp = adv/scale
+    l2 = np.linalg.norm(tmp, axis=(1,2))
+    print("Perturbation l2: " + str(l2))
+    print("Perturbation max: " + str(np.max(np.max(tmp, axis=1), axis=1)))
+
 
 def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack, m_target, m_adv):
         num_episodes = 0
         num_moves = 0
+        num_attacks = 0
         num_transfer = 0
         episode_rewards = [0.0]
         #video_recorder = None
@@ -138,6 +150,7 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
         while True:
                 env.unwrapped.render()
                 #video_recorder.capture_frame()
+                num_moves += 1
 
                 #V: Attack #
                 if attack != None:
@@ -147,11 +160,12 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                         max_q = max(q_vals)
                         min_q = min(q_vals)
                         diff = max_q - min_q
-                        thresh = 0.1
+                        thresh = 0
                         if diff < thresh:
                             action = act(np.array(obs)[None], stochastic=stochastic)[0]
 
                         else:
+                            num_attacks += 1
                             with m_adv.get_session().as_default():
                                 adv_obs = craft_adv_obs(np.array(obs)[None], stochastic_adv=stochastic)[0]
                             with m_target.get_session().as_default():
@@ -160,6 +174,16 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                                 if (action != action2):
                                     print("Attacked: {}".format(q_vals))
                                     num_transfer += 1
+
+                                np_adv = np.array(adv_obs)[None]
+                                np_obs = np.array(obs)[None]
+                                adv_perturbation = np_adv - np_obs
+                                print("Original:")
+                                img_stats(np_obs)
+                                print("Adversarial:")
+                                img_stats(np_adv)
+                                perturbation_stats(adv_perturbation)
+                                print(">")
                 else:
                         # Normal
                         action = act(np.array(obs)[None], stochastic=stochastic)[0]
@@ -181,12 +205,15 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                         print('Reward: ' + str(episode_rewards[-2]))
                         num_episodes = len(episode_rewards)
                         print ('Episode: ' + str(num_episodes))
-                        success = 100.0
                         if num_moves > 0:
-                                success = float((num_transfer)/num_moves) * 100.0
-                        print("Percentage of successful attacks: "+str(success))
+                            rate = float((num_attacks)/num_moves) * 100.0
+                            print("Percentage of moves attacked: "+str(rate))
+                        if num_attacks > 0:
+                            success = float((num_transfer)/num_attacks) * 100.0
+                            print("Percentage of successful attacks: "+str(success))
                         num_moves = 0
                         num_transfer = 0
+                        num_attacks = 0
                         return
 
 
