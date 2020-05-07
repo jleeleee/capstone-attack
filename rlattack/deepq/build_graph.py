@@ -74,6 +74,8 @@ from rlattack.str_attack import StrAttackL2
 from cleverhans.attacks import FastGradientMethod, BasicIterativeMethod, CarliniWagnerL2
 from cleverhans.model import CallableModelWrapper
 
+from rlattack.deepq.map import SaliencyMapOnly
+
 #V: act function for test-time attacks/vanilla #
 def build_act_enjoy (make_obs_ph, q_func, num_actions, noisy=False, scope="deepq", reuse=None, attack=None, model_path=''):
     with tf.variable_scope(scope, reuse=reuse):
@@ -157,6 +159,7 @@ def build_act_enjoy (make_obs_ph, q_func, num_actions, noisy=False, scope="deepq
             return act, act2
         else:
             return act, craft_adv_obs
+
 
 def build_adv(make_obs_tf, q_func, num_actions, epsilon, noisy, attack='fgsm'):
     with tf.variable_scope('deepq', reuse=tf.AUTO_REUSE):
@@ -451,4 +454,35 @@ def build_train(make_obs_ph, q_func, num_actions, optimizer, grad_norm_clipping=
 
         return act_f, train, update_target, {'q_values': q_values}, craft_adv_obs
 
+
+def build_map(make_obs_tf, q_func, num_actions, epsilon, noisy):
+    with tf.variable_scope('deepq', reuse=tf.AUTO_REUSE):
+        obs_tf_in = U.ensure_tf_input(make_obs_tf("observation"))
+        stochastic_ph_adv = tf.placeholder(tf.bool, (), name="stochastic_adv")
+        update_eps_ph_adv = tf.placeholder(tf.float32, (), name="update_eps_adv")
+        print("==========================================")
+
+        def wrapper(x):
+            return q_func(x, num_actions, scope="q_func", reuse=True)
+
+        # adversary = CarliniWagnerL2(CallableModelWrapper(wrapper, 'logits'), sess=U.get_session())
+        adversary = CarliniWagnerL2(
+            q_func(obs_tf_in.get(), num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy),
+            sess=U.get_session())
+        cw_params = {'binary_search_steps': 1,
+                     'max_iterations': 100,
+                     'learning_rate': 0.1,
+                     'initial_const': 10,
+                     'clip_min': 0,
+                     'clip_max': 1.0}
+        adv_observations = adversary.generate(obs_tf_in.get(), **cw_params) * 255.0
+
+
+        sm_params = {'theta': 1., 'gamma': 0.1,
+                    'clip_min': 0., 'clip_max': 1.,
+                    'y_target': None}
+        saliency_map = SaliencyMapOnly(
+            q_func(obs_tf_in.get(), num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy),
+            sess=U.get_session())
+        saliency_map = saliency_map.generate(obs_tf_in.get(), **sm_params) * 255.0
 
