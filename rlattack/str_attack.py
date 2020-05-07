@@ -463,7 +463,7 @@ class LADMMSTL2:
                 s = s + w - z
     
                 #yt = yt.reshape(imgs.shape)
-                #np.count_nonzero(o_besty)/batch_size
+                #np.count_nonzero(o_besty)/batch_size)
                 l2s, scores, nimg, y_grads = self.grad(imgs, labs, y, CONST)
     
                 for e, (l2, sc, ii,) in enumerate(zip(l2s, scores, nimg)):
@@ -575,5 +575,6 @@ class LADMMSTL2:
         
         #print("ro", self.ro, "gamma", gamma, "tau", tau, "alpha", alpha)
         #print("\ntotal groups:", P*Q)
+        print(o_bestl2)
         return o_bestattack, rVector
 

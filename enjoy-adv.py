@@ -36,6 +36,8 @@ from gym import wrappers
 from time import time
 import rlattack.common.tf_util as U
 
+from PIL import Image
+
 from rlattack import deepq
 from rlattack.common.misc_util import (
         boolean_flag,
@@ -137,9 +139,16 @@ def make_env(game_name):
     env = wrap_dqn(env)
     return env
 
-def img_stats(img):
+def img_stats(img, show=False):
     print("Image max: " + str(np.max(np.max(img, axis=1), axis=1)))
     print("Image min: " + str(np.min(np.min(img, axis=1), axis=1)))
+    if show:
+        for i in range(4):
+            image = Image.fromarray(np.floor(img[0,:,:,i]).astype(np.uint8), 'P')
+            print(img[0,:,:,i])
+            print(np.floor(img[0,:,:,i]).astype(np.uint8))
+            image.show()
+
 
 
 def perturbation_stats(adv, scale=1.0):
@@ -147,6 +156,7 @@ def perturbation_stats(adv, scale=1.0):
     l2 = np.linalg.norm(tmp, axis=(1,2))
     print("Perturbation l2: " + str(l2))
     print("Perturbation max: " + str(np.max(np.max(tmp, axis=1), axis=1)))
+    print("Perturbation min: " + str(np.min(np.min(tmp, axis=1), axis=1)))
 
 
 def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack, m_target, m_adv, craft_map):
@@ -196,11 +206,13 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                                 np_obs = np.array(obs)[None]
                                 adv_perturbation = np_adv - np_obs
                                 print("Original:")
-                                img_stats(np_obs)
+                                img_stats(np_obs, True)
                                 print("Adversarial:")
-                                img_stats(np_adv)
+                                img_stats(np_adv, True)
+                                img_stats(adv_perturbation,True)
                                 perturbation_stats(adv_perturbation)
                                 print(">")
+                                quit()
                 else:
                         # Normal
                         action = act(np.array(obs)[None], stochastic=stochastic)[0]

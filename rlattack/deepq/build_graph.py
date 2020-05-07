@@ -250,8 +250,8 @@ def build_adv(make_obs_tf, q_func, num_actions, epsilon, noisy, attack='fgsm'):
                          'clip_min': 0,
                          'clip_max': 1.0,
                          'image_size': 84,
-                         'stride': 4,
-                         'filter_size': 4,
+                         'stride': 2,
+                         'filter_size': 2,
                          'num_channels': 1}
 
             adv_observations = adversary.generate(obs_tf_in.get(), **str_params) * 255.0
