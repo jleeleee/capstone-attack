@@ -87,10 +87,10 @@ class StrAttackL2(Attack):
                   self.abort_early, self.initial_const, self.clip_min, self.clip_max, nb_classes,
                   x.get_shape().as_list()[1:], self.image_size, self.stride, self.filter_size, self.num_channels)
 
-    def cw_wrap(x_val, y_val):
+    def str_wrap(x_val, y_val):
       return np.array(attack.attack(x_val, y_val), dtype=self.np_dtype)
 
-    wrap = tf.py_func(cw_wrap, [x, labels], self.tf_dtype)
+    wrap = tf.py_func(str_wrap, [x, labels], self.tf_dtype)
     wrap.set_shape(x.get_shape())
 
     return wrap
@@ -318,22 +318,24 @@ class LADMMSTL2:
         """
         r = []
         rv = []
-        print('go up to', len(imgs))
+        #print('go up to', len(imgs))
         for i in range(0, len(imgs), self.batch_size):
-            print('tick', i)
+            #print('tick', i)
             r1, r2 = self.attack_batch(imgs[i:i + self.batch_size], targets[i:i + self.batch_size])
             r.extend(r1)
             rv = np.append(rv, r2)
         rv = rv.reshape([-1,3])
         rv = np.mean(rv, axis = 0)
 
-        print("\nnone zeros group:", rv[0], "\nl2 mean:", rv[1], "\nli mean", rv[2], "\n")
+        #print("\nnone zeros group:", rv[0], "\nl2 mean:", rv[1], "\nli mean", rv[2], "\n")
         return np.array(r)
 
     def attack_batch(self, imgs, labs):
         """
         Run the attack on a batch of images and labels.
         """
+
+        imgs = np.clip(imgs, self.clip_min, self.clip_max)
         batch_size = self.batch_size
         o_bestl2 = [1e10] * batch_size
         o_bestscore = [-1] * batch_size
@@ -348,10 +350,9 @@ class LADMMSTL2:
         tau = 3
         gamma = 2
         
-        print(self.model.__dict__)
         filterSize = self.filter_size
         stride = self.stride
-        print('grid size:', filterSize)
+        #print('grid size:', filterSize)
         n = self.image_size * self.image_size * self.num_channels
 
         P = np.floor((self.image_size - filterSize) / stride) + 1
@@ -383,7 +384,7 @@ class LADMMSTL2:
         index = np.tile(index, (batch_size,1,1))
 
         for outer_step in range(self.BINARY_SEARCH_STEPS):
-            print(outer_step, o_bestl2, CONST)
+            #print(outer_step, o_bestl2, CONST)
             
             #prev = 1e6
             bestl2 = [1e10]*batch_size
@@ -396,8 +397,8 @@ class LADMMSTL2:
             s = 0.0 * np.ones(imgs.shape)
             
             for iteration in range(self.MAX_ITERATIONS + outer_step * 1000 ):
-                if iteration % 200 == 0:
-                    print(iteration, 'best l2square:', o_bestl2, 'when l0:', np.count_nonzero((np.array(o_bestattack) - imgs).reshape([batch_size,-1]), axis = 1))
+                #if iteration % 200 == 0:
+                #    print(iteration, 'best l2square:', o_bestl2, 'when l0:', np.count_nonzero((np.array(o_bestattack) - imgs).reshape([batch_size,-1]), axis = 1))
     
                 # delta step
                 # l2
@@ -411,8 +412,8 @@ class LADMMSTL2:
     
                 # w step
                 temp = z - s
-                temp1 = np.where(temp > np.minimum(0.5 - imgs, ep), np.minimum(0.5 - imgs, ep), temp)
-                w = np.where(temp1 < np.maximum(-0.5 - imgs, -ep), np.maximum(-0.5 - imgs, -ep), temp1)
+                temp1 = np.where(temp > np.minimum(1 - imgs, ep), np.minimum(1 - imgs, ep), temp)
+                w = np.where(temp1 < np.maximum(-imgs, -ep), np.maximum(-imgs, -ep), temp1)
     
                 # y step
                 
@@ -470,7 +471,7 @@ class LADMMSTL2:
                         bestl2[e] = l2
                         bestscore[e] = np.argmax(sc)
                     if l2 < o_bestl2[e] and self.compare(sc, np.argmax(labs[e])):
-                        #print("change", e, o_bestl2[e] - l2)
+                        print("change", e, o_bestl2[e] - l2)
                         o_bestl2[e] = l2
                         o_bestscore[e] = np.argmax(sc)
                         o_bestattack[e] = ii
@@ -491,14 +492,14 @@ class LADMMSTL2:
                     else:
                         CONST[e] *= 5
     
-        print('Finally', o_bestl2)
+        #print('Finally', o_bestl2)
         # np.save("img",o_besty[8].squeeze())
         if self.retrain:
             lower_bound = np.zeros(batch_size)
             CONST = np.ones(batch_size) * 5 # 5 for imgnet
             upper_bound = np.ones(batch_size)*1e10
             for tmpi in range(8):
-                print("retrain C:", CONST)
+                #print("retrain C:", CONST)
                 bestl2 = [1e10]*batch_size
                 bestscore = [-1]*batch_size
                 
@@ -515,8 +516,8 @@ class LADMMSTL2:
                 u1 = 0.0 * np.ones(imgs.shape)
                 tmpC = self.ro / (self.ro + gamma/100)
                 for outer_step in range(400):
-                    if outer_step % 200 == 0:
-                        print("retrain", tmpi, outer_step, o_bestl2)
+                    #if outer_step % 200 == 0:
+                    #    print("retrain", tmpi, outer_step, o_bestl2)
     
                     tempA = (z1 - u1) * tmpC
                     tempA1 = np.where(np.abs(o_besty) <= e0, 0, tempA)
@@ -572,7 +573,7 @@ class LADMMSTL2:
         rVector[1] =  np.mean(resultl2)
         rVector[2] =  np.mean(resultli)
         
-        print("ro", self.ro, "gamma", gamma, "tau", tau, "alpha", alpha)
-        print("\ntotal groups:", P*Q)
+        #print("ro", self.ro, "gamma", gamma, "tau", tau, "alpha", alpha)
+        #print("\ntotal groups:", P*Q)
         return o_bestattack, rVector
 

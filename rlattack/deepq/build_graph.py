@@ -73,6 +73,8 @@ from rlattack.str_attack import StrAttackL2
 #V: Cleverhans imports#
 from cleverhans.attacks import FastGradientMethod, BasicIterativeMethod, CarliniWagnerL2
 from cleverhans.model import CallableModelWrapper
+from cleverhans.compat import reduce_max, reduce_min
+import numpy as np
 
 from rlattack.deepq.map import SaliencyMapOnly
 
@@ -175,6 +177,12 @@ def build_adv(make_obs_tf, q_func, num_actions, epsilon, noisy, attack='fgsm'):
         #adversary = FastGradientMethod(q_func(obs_tf_in.get(), num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy), sess=U.get_session())
         #adv_observations = adversary.generate(obs_tf_in.get(), eps=epsilon, clip_min=0, clip_max=1.0) * 255.0
 
+        def print_target(gt):
+            result = gt.copy()
+            print("Attack target: " + str(np.argmax(result[0])))
+            return result
+
+
         if attack == None or attack == 'fgsm':
             def wrapper(x):
                 return q_func(x, num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy)
@@ -194,10 +202,24 @@ def build_adv(make_obs_tf, q_func, num_actions, epsilon, noisy, attack='fgsm'):
                 return q_func(x, num_actions, scope="q_func", reuse=True)
             #adversary = CarliniWagnerL2(CallableModelWrapper(wrapper, 'logits'), sess=U.get_session())
             adversary = CarliniWagnerL2(q_func(obs_tf_in.get(), num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy), sess=U.get_session())
+
+            preds = adversary.model.get_probs(obs_tf_in.get())
+            preds_max = reduce_min(preds, 1, keepdims=True)
+            original_predictions = tf.to_float(tf.equal(preds, preds_max))
+            labels = tf.stop_gradient(original_predictions)
+            if isinstance(labels, np.ndarray):
+              nb_classes = labels.shape[1]
+            else:
+              nb_classes = labels.get_shape().as_list()[1]
+
+            y_target = tf.py_func(print_target, [labels],
+                                       adversary.tf_dtype)
+            y_target.set_shape([None, nb_classes])
             cw_params = {'binary_search_steps': 1,
                          'max_iterations': 100,
                          'learning_rate': 0.1,
                          'initial_const': 10,
+                         #'y_target': y_target,
                          'clip_min': 0,
                          'clip_max': 1.0}
             adv_observations = adversary.generate(obs_tf_in.get(), **cw_params) * 255.0
@@ -206,16 +228,32 @@ def build_adv(make_obs_tf, q_func, num_actions, epsilon, noisy, attack='fgsm'):
                 return q_func(x, num_actions, scope="q_func", reuse=True)
             #adversary = StrAttackL2(CallableModelWrapper(wrapper, 'logits'), sess=U.get_session())
             adversary = StrAttackL2(q_func(obs_tf_in.get(), num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy), sess=U.get_session())
+
+            preds = adversary.model.get_probs(obs_tf_in.get())
+            preds_max = reduce_min(preds, 1, keepdims=True)
+            original_predictions = tf.to_float(tf.equal(preds, preds_max))
+            labels = tf.stop_gradient(original_predictions)
+            if isinstance(labels, np.ndarray):
+              nb_classes = labels.shape[1]
+            else:
+              nb_classes = labels.get_shape().as_list()[1]
+
+            y_target = tf.py_func(print_target, [labels],
+                                       adversary.tf_dtype)
+            y_target.set_shape([None, nb_classes])
+
             str_params = {'binary_search_steps': 1,
                          'max_iterations': 100,
                          'learning_rate': 0.1,
                          'initial_const': 10,
+                         #'y_target': y_target,
                          'clip_min': 0,
                          'clip_max': 1.0,
                          'image_size': 84,
-                         'stride': 2,
-                         'filter_size': 2,
+                         'stride': 4,
+                         'filter_size': 4,
                          'num_channels': 1}
+
             adv_observations = adversary.generate(obs_tf_in.get(), **str_params) * 255.0
         else:
             print("Unknown attack specified")
