@@ -462,27 +462,29 @@ def build_map(make_obs_tf, q_func, num_actions, epsilon, noisy):
         update_eps_ph_adv = tf.placeholder(tf.float32, (), name="update_eps_adv")
         print("==========================================")
 
-        def wrapper(x):
-            return q_func(x, num_actions, scope="q_func", reuse=True)
-
-        # adversary = CarliniWagnerL2(CallableModelWrapper(wrapper, 'logits'), sess=U.get_session())
-        adversary = CarliniWagnerL2(
+        saliency_map = SaliencyMapOnly(
             q_func(obs_tf_in.get(), num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy),
             sess=U.get_session())
-        cw_params = {'binary_search_steps': 1,
-                     'max_iterations': 100,
-                     'learning_rate': 0.1,
-                     'initial_const': 10,
-                     'clip_min': 0,
-                     'clip_max': 1.0}
-        adv_observations = adversary.generate(obs_tf_in.get(), **cw_params) * 255.0
 
+        preds = saliency_map.model.get_probs(obs_tf_in.get())
+        preds_max = reduce_min(preds, 1, keepdims=True)
+        original_predictions = tf.to_float(tf.equal(preds, preds_max))
+        labels = tf.stop_gradient(original_predictions)
+        if isinstance(labels, np.ndarray):
+            nb_classes = labels.shape[1]
+        else:
+            nb_classes = labels.get_shape().as_list()[1]
+
+        y_target = tf.py_func(print_target, [labels],
+                              adversary.tf_dtype)
+        y_target.set_shape([None, nb_classes])
+
+        def wrapper(x):
+            return q_func(x, num_actions, scope="q_func", reuse=True)
 
         sm_params = {'theta': 1., 'gamma': 0.1,
                     'clip_min': 0., 'clip_max': 1.,
                     'y_target': None}
-        saliency_map = SaliencyMapOnly(
-            q_func(obs_tf_in.get(), num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy),
-            sess=U.get_session())
         saliency_map = saliency_map.generate(obs_tf_in.get(), **sm_params) * 255.0
+
 
