@@ -100,5 +100,6 @@ def asm_symbolic(x, y_target, model, theta, gamma, clip_min, clip_max):
     grads_target = reduce_sum(grads * target_class, axis=0)
     grads_other = reduce_sum(grads * other_classes, axis=0)
 
-    print(grads_target)
-    return grads
+
+    # print(grads_target)
+    return grads_target

@@ -498,6 +498,8 @@ def build_map(make_obs_tf, q_func, num_actions, epsilon, noisy):
         obs_tf_in = U.ensure_tf_input(make_obs_tf("observation"))
         stochastic_ph_adv = tf.placeholder(tf.bool, (), name="stochastic_adv")
         update_eps_ph_adv = tf.placeholder(tf.float32, (), name="update_eps_adv")
+        eps = tf.get_variable("eps", (), initializer=tf.constant_initializer(0))
+        update_eps_expr_adv = eps.assign(tf.cond(update_eps_ph_adv >= 0, lambda: update_eps_ph_adv, lambda: eps))
         print("==========================================")
 
         saliency_map = SaliencyMapOnly(
@@ -513,16 +515,27 @@ def build_map(make_obs_tf, q_func, num_actions, epsilon, noisy):
         else:
             nb_classes = labels.get_shape().as_list()[1]
 
-        y_target = tf.py_func(print_target, [labels],
-                              adversary.tf_dtype)
+        def print_target(gt):
+            result = gt.copy()
+            print("Attack target: " + str(np.argmax(result[0])))
+            return result
+        y_target = tf.py_func(print_target, [labels], saliency_map.tf_dtype)
         y_target.set_shape([None, nb_classes])
 
-        def wrapper(x):
-            return q_func(x, num_actions, scope="q_func", reuse=True)
+        sm_params = {'theta': 1.,
+                     'gamma': 0.1,
+                     'clip_min': 0.,
+                     'clip_max': 1.,
+                     'y_target': y_target
+                     }
 
-        sm_params = {'theta': 1., 'gamma': 0.1,
-                    'clip_min': 0., 'clip_max': 1.,
-                    'y_target': None}
-        saliency_map = saliency_map.generate(obs_tf_in.get(), **sm_params) * 255.0
+        target_map = saliency_map.generate(obs_tf_in.get(), **sm_params)
+        craft_map_obs = U.function(inputs=[obs_tf_in, stochastic_ph_adv, update_eps_ph_adv],
+                                   outputs=target_map,
+                                   givens={update_eps_ph_adv: -1.0, stochastic_ph_adv: True},
+                                   updates=[update_eps_expr_adv])
+        return craft_map_obs
+
+
 
 

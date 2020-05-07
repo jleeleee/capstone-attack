@@ -2,6 +2,7 @@ tensorflow/
 gym/
 baselines/
 cleverhans/
+videos/
 
 *.swp
 *.pyc
