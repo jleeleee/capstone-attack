@@ -28,7 +28,7 @@ from multiprocessing.pool import ThreadPool
 
 
 
-# pool = ThreadPool()
+pool = ThreadPool()
 
 class StrAttackL2(Attack):
   """
@@ -171,9 +171,9 @@ ABORT_EARLY = True  # if we stop improving, abort gradient descent early
 LEARNING_RATE = 1e-2  # larger values converge faster to less accurate results 1e-2 for MNIST, 1e-3 for cifar and imagenet
 TARGETED = True  # should we target one specific class? or just be wrong?
 CONFIDENCE = 0  # how strong the adversarial example should be
-INITIAL_CONST = 1  # the initial constant c to pick as a first guess
+INITIAL_CONST = 10  # the initial constant c to pick as a first guess
 RO = 15
-RETRAIN = False
+RETRAIN = True
 
 class LADMMSTL2:
     def __init__(self, sess, model, batch_size=1, confidence=CONFIDENCE,
@@ -242,6 +242,13 @@ class LADMMSTL2:
         else:
             return x != y
 
+    def get_confidence(self, sc, target):
+        x = np.delete(sc, target)
+        x = x - sc[target]
+        if self.TARGETED:
+            return np.max(-x)
+        return np.max(x)
+
     def gradient_descent(self, sess, model):
 
         batch_size = self.batch_size
@@ -273,7 +280,7 @@ class LADMMSTL2:
 
 
         #output = model.predict(newimg)
-        output = model.get_logits(newimg)
+        output = model.get_probs(newimg)
 
         real = tf.reduce_sum(tlab * output, 1)
         other = tf.reduce_max((1 - tlab) * output - (tlab * 10000), 1)
@@ -335,10 +342,12 @@ class LADMMSTL2:
         Run the attack on a batch of images and labels.
         """
 
-        imgs = np.clip(imgs, self.clip_min, self.clip_max)
+        print(labs)
+        #imgs = np.clip(imgs, self.clip_min, self.clip_max)
         batch_size = self.batch_size
         o_bestl2 = [1e10] * batch_size
         o_bestscore = [-1] * batch_size
+        o_bestconf = [-1] * batch_size
         o_bestattack = [np.zeros(imgs[0].shape)] * batch_size
         o_besty = np.ones(imgs.shape)
         
@@ -395,8 +404,10 @@ class LADMMSTL2:
             v = 0.0 * np.ones(imgs.shape)
             u = 0.0 * np.ones(imgs.shape)
             s = 0.0 * np.ones(imgs.shape)
+            iteration = -1
             
             for iteration in range(self.MAX_ITERATIONS + outer_step * 1000 ):
+                iteration += 1
                 #if iteration % 200 == 0:
                 #    print(iteration, 'best l2square:', o_bestl2, 'when l0:', np.count_nonzero((np.array(o_bestattack) - imgs).reshape([batch_size,-1]), axis = 1))
     
@@ -413,7 +424,7 @@ class LADMMSTL2:
                 # w step
                 temp = z - s
                 temp1 = np.where(temp > np.minimum(1 - imgs, ep), np.minimum(1 - imgs, ep), temp)
-                w = np.where(temp1 < np.maximum(-imgs, -ep), np.maximum(-imgs, -ep), temp1)
+                w = np.where(temp1 < np.maximum(0-imgs, -ep), np.maximum(0-imgs, -ep), temp1)
     
                 # y step
                 
@@ -470,10 +481,14 @@ class LADMMSTL2:
                     if l2 < bestl2[e] and self.compare(sc, np.argmax(labs[e])):
                         bestl2[e] = l2
                         bestscore[e] = np.argmax(sc)
-                    if l2 < o_bestl2[e] and self.compare(sc, np.argmax(labs[e])):
+                    conf = self.get_confidence(sc, np.argmax(labs[e]))
+                    #if conf < o_bestconf[e] and self.compare(sc, np.argmax(labs[e])):
+                    if conf > o_bestconf[e]:
                         print("change", e, o_bestl2[e] - l2)
                         o_bestl2[e] = l2
                         o_bestscore[e] = np.argmax(sc)
+                        target = np.argmax(labs[e])
+                        o_bestconf[e] = conf
                         o_bestattack[e] = ii
                         o_besty[e] = y[e]
                     
@@ -521,10 +536,10 @@ class LADMMSTL2:
     
                     tempA = (z1 - u1) * tmpC
                     tempA1 = np.where(np.abs(o_besty) <= e0, 0, tempA)
-                    tempA2 = np.where(np.logical_and(tempA > np.minimum(0.5 - imgs, ep), (np.abs(o_besty) > e0)),
-                                      np.minimum(0.5 - imgs, ep), tempA1)
-                    deltA = np.where(np.logical_and(tempA < np.maximum(-0.5 - imgs, -ep), (np.abs(o_besty) > e0)),
-                                     np.maximum(-0.5 - imgs, -ep), tempA2)
+                    tempA2 = np.where(np.logical_and(tempA > np.minimum(1 - imgs, ep), (np.abs(o_besty) > e0)),
+                                      np.minimum(1 - imgs, ep), tempA1)
+                    deltA = np.where(np.logical_and(tempA < np.maximum(0 - imgs, -ep), (np.abs(o_besty) > e0)),
+                                     np.maximum(0 - imgs, -ep), tempA2)
     
                     l2s, scores, nimg, z_grads = self.grad(imgs, labs, deltA, CONST)
                     z1 = 1 / (alpha + 2 * self.ro) * (alpha * z1 + self.ro * (deltA + u1) - np.multiply(z_grads[0],A2))
@@ -575,6 +590,5 @@ class LADMMSTL2:
         
         #print("ro", self.ro, "gamma", gamma, "tau", tau, "alpha", alpha)
         #print("\ntotal groups:", P*Q)
-        print(o_bestl2)
         return o_bestattack, rVector
 

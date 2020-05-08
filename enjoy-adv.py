@@ -147,8 +147,8 @@ def img_stats(img, show=False):
     if show:
         for i in range(4):
             image = Image.fromarray(np.floor(img[0,:,:,i]).astype(np.uint8), 'P')
-            print(img[0,:,:,i])
-            print(np.floor(img[0,:,:,i]).astype(np.uint8))
+            #print(img[0,:,:,i])
+            #print(np.floor(img[0,:,:,i]).astype(np.uint8))
             image.show()
 
 
@@ -163,7 +163,6 @@ def perturbation_stats(adv, scale=1.0):
 def is_score(asm, perturbation, nu=90):
     B_asm = asm.copy()
     thresh = np.percentile(B_asm, nu)
-    print(thresh)
     B_asm[B_asm < thresh] = 0
     B_asm[B_asm >= thresh] = 1
     B_asm_perturb = np.multiply(B_asm, perturbation)
@@ -172,8 +171,8 @@ def is_score(asm, perturbation, nu=90):
     return numer/denom, B_asm_perturb.reshape((1, 84, 84, 4))
 
 def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack, m_target, m_adv, craft_asm, nu):
-        num_episodes = 0
         num_moves = 0
+        num_episodes = 0
         num_attacks = 0
         num_transfer = 0
         episode_rewards = [0.0]
@@ -195,7 +194,7 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                         max_q = max(q_vals)
                         min_q = min(q_vals)
                         diff = max_q - min_q
-                        thresh = 0
+                        thresh = 0.1
                         if diff < thresh:
                             action = act(np.array(obs)[None], stochastic=stochastic)[0]
 
@@ -215,10 +214,10 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                                 adv_perturbation = np_adv - np_obs
                                 print(adv_perturbation)
                                 print("Original:")
-                                # img_stats(np_obs, True)
+                                img_stats(np_obs)
                                 print("Adversarial:")
-                                # img_stats(np_adv, True)
-                                # img_stats(adv_perturbation,True)
+                                img_stats(np_adv)
+                                img_stats(adv_perturbation)
                                 perturbation_stats(adv_perturbation)
                                 print(">")
                                 print("************************\n CREATING MAP \n ")
@@ -292,4 +291,6 @@ if __name__ == '__main__':
         with m1.get_session().as_default():
             craft_asm = m1.craft_map()
             craft_adv_obs = m1.craft_adv()
+            if args.nu is None:
+                args.nu = 90
             play(env, m1.get_act(), craft_adv_obs, None, args.stochastic, args.video, args.attack, m1, m1, craft_asm, args.nu)
