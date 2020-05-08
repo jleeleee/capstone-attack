@@ -109,6 +109,7 @@ class DQNModel:
                         num_actions=self.env.action_space.n,
                         epsilon=1.0 / 255.0,
                         noisy=self.noisy,
+                        output_shape=(None, self.env.action_space.n)
                     )
             return craft_map
 
@@ -158,8 +159,15 @@ def perturbation_stats(adv, scale=1.0):
     print("Perturbation max: " + str(np.max(np.max(tmp, axis=1), axis=1)))
     print("Perturbation min: " + str(np.min(np.min(tmp, axis=1), axis=1)))
 
+def is_score(asm, perturbation, nu=0.01):
+    B_asm = asm.copy()
+    B_asm[B_asm < nu] = 0
+    B_asm[B_asm >= nu] = 1
+    numer = np.linalg.norm(B_asm * perturbation)
+    denom = np.linalg.norm(perturbation)
+    return numer/denom
 
-def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack, m_target, m_adv, craft_map):
+def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack, m_target, m_adv, craft_asm):
         num_episodes = 0
         num_moves = 0
         num_attacks = 0
@@ -169,6 +177,7 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
         #video_recorder = VideoRecorder(
         #	env, video_path, enabled=video_path is not None)
         obs = env.reset()
+        is_record = []
         while True:
                 env.unwrapped.render()
                 #video_recorder.capture_frame()
@@ -190,29 +199,40 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                             num_attacks += 1
                             with m_adv.get_session().as_default():
                                 adv_obs = craft_adv_obs(np.array(obs)[None], stochastic_adv=stochastic)[0]
-                                print("\n\n************************\n CREATING MAP \n\n ")
-                                adv_map = craft_map(np.array(adv_obs)[None], stochastic_adv=stochastic)[0]
-                                print(adv_map)
-                                print(adv_map.shape)
-                                print("************************")
                             with m_target.get_session().as_default():
                                 action = act(np.array(adv_obs)[None], stochastic=stochastic)[0]
                                 action2 = act(np.array(obs)[None], stochastic=stochastic)[0]
                                 if (action != action2):
-                                    print("Attacked: {}".format(q_vals))
+                                    print("Attacked: changed {} to {} with q_vals={}".format(action2, action, q_vals))
                                     num_transfer += 1
 
                                 np_adv = np.array(adv_obs)[None]
                                 np_obs = np.array(obs)[None]
                                 adv_perturbation = np_adv - np_obs
+                                print(adv_perturbation)
                                 print("Original:")
-                                img_stats(np_obs, True)
+                                # img_stats(np_obs, True)
                                 print("Adversarial:")
-                                img_stats(np_adv, True)
-                                img_stats(adv_perturbation,True)
+                                # img_stats(np_adv, True)
+                                # img_stats(adv_perturbation,True)
                                 perturbation_stats(adv_perturbation)
                                 print(">")
-                                quit()
+                                print("************************\n CREATING MAP \n ")
+                                adv_map = craft_asm(
+                                    np.array(obs)[None],
+                                    stochastic_adv=stochastic,
+                                )
+                                scaled_img_map = adv_map.copy().reshape((1,84,84,4))
+                                for frame in range(4):
+                                    max_val = np.max(scaled_img_map[:,:,:,frame])
+                                    img = scaled_img_map[:,:,:,frame]/max_val
+                                    scaled_img_map[:,:,:,frame] = img*255
+                                interpretability = is_score(adv_map, adv_perturbation.reshape((84*84*4)), nu=0.001)
+                                print("Interpretability Score: {}".format(interpretability))
+                                is_record.append(interpretability)
+                                # img_stats(scaled_img_map*255,True)
+                                print("************************")
+                                # quit()
                 else:
                         # Normal
                         action = act(np.array(obs)[None], stochastic=stochastic)[0]
@@ -243,6 +263,9 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                         num_moves = 0
                         num_transfer = 0
                         num_attacks = 0
+                        if len(is_record) > 0:
+                            print("Avg interp: {}".format(np.mean(is_record)))
+                            print(is_record)
                         return
 
 
@@ -263,6 +286,6 @@ if __name__ == '__main__':
                 play(env, m1.get_act(), craft_adv_obs, craft_adv_obs2, args.stochastic, args.video, args.attack, m1, m2)
     else:
         with m1.get_session().as_default():
-            craft_map = m1.craft_map()
+            craft_asm = m1.craft_map()
             craft_adv_obs = m1.craft_adv()
-            play(env, m1.get_act(), craft_adv_obs, None, args.stochastic, args.video, args.attack, m1, m1, craft_map)
+            play(env, m1.get_act(), craft_adv_obs, None, args.stochastic, args.video, args.attack, m1, m1, craft_asm)

@@ -8,12 +8,20 @@ import tensorflow as tf
 from cleverhans.attacks.attack import Attack
 from cleverhans.compat import reduce_sum, reduce_max, reduce_any
 
+from random import randint
+
 tf_dtype = tf.as_dtype('float32')
 
 class SaliencyMapOnly(SaliencyMapMethod):
     """
     Just the relevant parts for creating the Saliency Map
     """
+
+    def __init__(self, model, sess=None, dtypestr='float32', **kwargs):
+        print(**kwargs)
+        super(SaliencyMapOnly, self).__init__(model, sess, dtypestr, **kwargs)
+        self.feedable_kwargs = ('y_target', 'y_true')
+
     def generate(self, x, **kwargs):
         """
         Generate symbolic graph for adversarial examples and return.
@@ -23,38 +31,37 @@ class SaliencyMapOnly(SaliencyMapMethod):
         # Parse and save attack-specific parameters
         assert self.parse_params(**kwargs)
 
-        # Create random targets if y_target not provided
-        if self.y_target is None:
-            from random import randint
-
-            def random_targets(gt):
-                result = gt.copy()
-                nb_s = gt.shape[0]
-                nb_classes = gt.shape[1]
-
-                for i in range(nb_s):
-                    result[i, :] = np.roll(result[i, :],
-                                           randint(1, nb_classes - 1))
-
-                return result
-
-            labels, nb_classes = self.get_or_guess_labels(x, kwargs)
-            self.y_target = tf.py_func(random_targets, [labels],
-                                       self.tf_dtype)
-            self.y_target.set_shape([None, nb_classes])
-
         x_adv = asm_symbolic(
             x,
             model=self.model,
             y_target=self.y_target,
-            theta=self.theta,
-            gamma=self.gamma,
-            clip_min=self.clip_min,
-            clip_max=self.clip_max)
+            y_true=self.y_true,
+        )
         return x_adv
 
+    def parse_params(self,
+                     y_target=None,
+                     y_true=None,
+                     symbolic_impl=True,
+                     **kwargs):
+        self.y_target = y_target
+        self.y_true = y_true
+        return True
 
-def asm_symbolic(x, y_target, model, theta, gamma, clip_min, clip_max):
+def scale_to_range(tensor, scaler=1):
+    tensor = tf.div(
+        tf.subtract(
+            tensor,
+            tf.reduce_min(tensor)
+        ),
+        tf.subtract(
+            tf.reduce_max(tensor),
+            tf.reduce_min(tensor)
+        )
+    )
+    return tensor*scaler
+
+def asm_symbolic(x, y_target, y_true, model):
     """
     TensorFlow implementation of the JSMA (see https://arxiv.org/abs/1511.07528
     for details about the algorithm design choices).
@@ -69,6 +76,7 @@ def asm_symbolic(x, y_target, model, theta, gamma, clip_min, clip_max):
     :return: a tensor for the adversarial saliency map
     """
 
+
     nb_classes = int(y_target.shape[-1].value)
     nb_features = int(np.product(x.shape[1:]).value)
 
@@ -79,6 +87,14 @@ def asm_symbolic(x, y_target, model, theta, gamma, clip_min, clip_max):
         warnings.warn("Downcasting labels---this should be harmless unless"
                       " they are smoothed")
         y_target = tf.cast(y_target, tf.float32)
+
+    if x.dtype == tf.float32 and y_true.dtype == tf.int64:
+        y_true = tf.cast(y_true, tf.int32)
+
+    if x.dtype == tf.float32 and y_true.dtype == tf.float64:
+        warnings.warn("Downcasting labels---this should be harmless unless"
+                      " they are smoothed")
+        y_true = tf.cast(y_true, tf.float32)
 
     logits = model.get_logits(x)
     # create the Jacobian graph
@@ -95,11 +111,15 @@ def asm_symbolic(x, y_target, model, theta, gamma, clip_min, clip_max):
     # The last dimention is added to allow broadcasting later.
     target_class = tf.reshape(
         tf.transpose(y_target, perm=[1, 0]), shape=[nb_classes, -1, 1])
-    other_classes = tf.cast(tf.not_equal(target_class, 1), tf_dtype)
+    true_class = tf.reshape(
+        tf.transpose(y_true, perm=[1, 0]), shape=[nb_classes, -1, 1])
 
     grads_target = reduce_sum(grads * target_class, axis=0)
-    grads_other = reduce_sum(grads * other_classes, axis=0)
+    grads_true = reduce_sum(grads * true_class, axis=0)
 
+    z_grads_target = tf.nn.relu(grads_target)
+    z_grads_true = tf.nn.relu(tf.negative(grads_true))
+    asm = tf.multiply(z_grads_true, z_grads_target)
 
     # print(grads_target)
-    return grads_target
+    return asm

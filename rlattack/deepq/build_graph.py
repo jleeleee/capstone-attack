@@ -246,7 +246,7 @@ def build_adv(make_obs_tf, q_func, num_actions, epsilon, noisy, attack='fgsm'):
                          'max_iterations': 100,
                          'learning_rate': 0.1,
                          'initial_const': 10,
-                         #'y_target': y_target,
+                         'y_target': y_target,
                          'clip_min': 0,
                          'clip_max': 1.0,
                          'image_size': 84,
@@ -493,40 +493,52 @@ def build_train(make_obs_ph, q_func, num_actions, optimizer, grad_norm_clipping=
         return act_f, train, update_target, {'q_values': q_values}, craft_adv_obs
 
 
-def build_map(make_obs_tf, q_func, num_actions, epsilon, noisy):
+
+def build_map(make_obs_tf, q_func, num_actions, epsilon, noisy, output_shape):
     with tf.variable_scope('deepq', reuse=tf.AUTO_REUSE):
         obs_tf_in = U.ensure_tf_input(make_obs_tf("observation"))
         stochastic_ph_adv = tf.placeholder(tf.bool, (), name="stochastic_adv")
         update_eps_ph_adv = tf.placeholder(tf.float32, (), name="update_eps_adv")
-        eps = tf.get_variable("eps", (), initializer=tf.constant_initializer(0))
-        update_eps_expr_adv = eps.assign(tf.cond(update_eps_ph_adv >= 0, lambda: update_eps_ph_adv, lambda: eps))
-        print("==========================================")
 
         saliency_map = SaliencyMapOnly(
             q_func(obs_tf_in.get(), num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy),
             sess=U.get_session())
 
-        preds = saliency_map.model.get_probs(obs_tf_in.get())
-        preds_max = reduce_min(preds, 1, keepdims=True)
-        original_predictions = tf.to_float(tf.equal(preds, preds_max))
-        labels = tf.stop_gradient(original_predictions)
-        if isinstance(labels, np.ndarray):
-            nb_classes = labels.shape[1]
-        else:
-            nb_classes = labels.get_shape().as_list()[1]
+        eps = tf.get_variable("eps", (), initializer=tf.constant_initializer(0))
+        update_eps_expr_adv = eps.assign(tf.cond(update_eps_ph_adv >= 0, lambda: update_eps_ph_adv, lambda: eps))
+        print("==========================================")
 
-        def print_target(gt):
+        preds = saliency_map.model.get_probs(obs_tf_in.get())
+
+        def print_true(gt):
             result = gt.copy()
-            print("Attack target: " + str(np.argmax(result[0])))
+            print("Result: " + str(result[0]))
             return result
-        y_target = tf.py_func(print_target, [labels], saliency_map.tf_dtype)
+
+        preds_max = reduce_max(preds, 1, keepdims=True)
+        true_predictions = tf.to_float(tf.equal(preds, preds_max))
+        labels_true = tf.stop_gradient(true_predictions)
+        if isinstance(labels_true, np.ndarray):
+            nb_classes = labels_true.shape[1]
+        else:
+            nb_classes = labels_true.get_shape().as_list()[1]
+        y_true = tf.py_func(print_true, [labels_true],
+                              saliency_map.tf_dtype)
+        y_true.set_shape([None, nb_classes])
+
+        preds_min = reduce_min(preds, 1, keepdims=True)
+        target_predictions = tf.to_float(tf.equal(preds, preds_min))
+        labels_target = tf.stop_gradient(target_predictions)
+        if isinstance(labels_target, np.ndarray):
+            nb_classes = labels_target.shape[1]
+        else:
+            nb_classes = labels_target.get_shape().as_list()[1]
+        y_target = tf.py_func(print_true, [labels_target],
+                              saliency_map.tf_dtype)
         y_target.set_shape([None, nb_classes])
 
-        sm_params = {'theta': 1.,
-                     'gamma': 0.1,
-                     'clip_min': 0.,
-                     'clip_max': 1.,
-                     'y_target': y_target
+        sm_params = {'y_target': y_target,
+                     'y_true': y_true,
                      }
 
         target_map = saliency_map.generate(obs_tf_in.get(), **sm_params)
@@ -534,6 +546,7 @@ def build_map(make_obs_tf, q_func, num_actions, epsilon, noisy):
                                    outputs=target_map,
                                    givens={update_eps_ph_adv: -1.0, stochastic_ph_adv: True},
                                    updates=[update_eps_expr_adv])
+
         return craft_map_obs
 
 
