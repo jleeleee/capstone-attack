@@ -128,7 +128,7 @@ def parse_args():
     #V: Attack Arguments#
     parser.add_argument("--model-dir2", type=str, default=None, help="load adversarial model from this directory (blackbox attacks). ")
     parser.add_argument("--attack", type=str, default=None, help="Method to attack the model.")
-    parser.add_argument("--nu", type=int, default=None, help="Percentile of ASM.")
+    parser.add_argument("--nu", type=int, default=50, help="Percentile of ASM.")
     boolean_flag(parser, "noisy", default=False, help="whether or not to NoisyNetwork")
     boolean_flag(parser, "noisy2", default=False, help="whether or not to NoisyNetwork")
     boolean_flag(parser, "blackbox", default=False, help="whether or not to NoisyNetwork")
@@ -187,6 +187,8 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
         orig_frames = []
         basm_map_frames = []
         adv_frames = []
+        t_attack = []
+        prefs = []
         while True:
                 env.unwrapped.render()
                 #video_recorder.capture_frame()
@@ -248,6 +250,8 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                                 interpretability, perturb_map = is_score(adv_map, adv_perturbation.reshape((84*84*4)), nu=nu)
                                 print("Interpretability Score: {}".format(interpretability))
                                 is_record.append(interpretability)
+                                t_attack.append(num_moves)
+                                prefs.append(diff)
                                 for i in range(4):
                                     basm_map_frames.append(perturb_map[0,:,:,i])
                                 print("*******************")
@@ -286,8 +290,17 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                             vd.write_video(orig_frames, basm_map_frames)
                             print("Done")
                         if len(is_record) > 0:
+                            scaled_prefs = np.array(prefs)
+                            scaled_prefs = scaled_prefs/np.max(scaled_prefs)
                             print(is_record)
+                            print(prefs)
+                            print(scaled_prefs)
                             print("Avg interp: {}".format(np.mean(is_record)))
+                            print("Pref weighted interp: {}".format(np.mean(np.multiply(is_record, scaled_prefs))))
+                        if len(t_attack) > 2:
+                            # print("Times attacked: {}".format(t_attack))
+                            attack_gaps = [j-i for i, j in zip(t_attack[:-1], t_attack[1:])]
+                            # print("{}".format(attack_gaps))
                         return
 
 
