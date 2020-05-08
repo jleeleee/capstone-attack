@@ -76,7 +76,7 @@ from cleverhans.model import CallableModelWrapper
 from cleverhans.compat import reduce_max, reduce_min
 import numpy as np
 
-from rlattack.deepq.map import SaliencyMapOnly
+from rlattack.deepq.map import SaliencyMap
 
 #V: act function for test-time attacks/vanilla #
 def build_act_enjoy (make_obs_ph, q_func, num_actions, noisy=False, scope="deepq", reuse=None, attack=None, model_path=''):
@@ -500,7 +500,7 @@ def build_map(make_obs_tf, q_func, num_actions, epsilon, noisy, output_shape):
         stochastic_ph_adv = tf.placeholder(tf.bool, (), name="stochastic_adv")
         update_eps_ph_adv = tf.placeholder(tf.float32, (), name="update_eps_adv")
 
-        saliency_map = SaliencyMapOnly(
+        saliency_map = SaliencyMap(
             q_func(obs_tf_in.get(), num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy),
             sess=U.get_session())
 

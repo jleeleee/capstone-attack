@@ -12,14 +12,14 @@ from random import randint
 
 tf_dtype = tf.as_dtype('float32')
 
-class SaliencyMapOnly(SaliencyMapMethod):
+class SaliencyMap(SaliencyMapMethod):
     """
     Just the relevant parts for creating the Saliency Map
     """
 
     def __init__(self, model, sess=None, dtypestr='float32', **kwargs):
         print(**kwargs)
-        super(SaliencyMapOnly, self).__init__(model, sess, dtypestr, **kwargs)
+        super(SaliencyMap, self).__init__(model, sess, dtypestr, **kwargs)
         self.feedable_kwargs = ('y_target', 'y_true')
 
     def generate(self, x, **kwargs):
