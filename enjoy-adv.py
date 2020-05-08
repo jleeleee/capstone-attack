@@ -217,7 +217,7 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                                 # img_stats(np_obs, True)
                                 print("Adversarial:")
                                 # img_stats(np_adv, True)
-                                # img_stats(adv_perturbation,True)
+                                img_stats(adv_perturbation,True)
                                 perturbation_stats(adv_perturbation)
                                 print(">")
                                 print("************************\n CREATING MAP \n ")
