@@ -159,13 +159,16 @@ def perturbation_stats(adv, scale=1.0):
     print("Perturbation max: " + str(np.max(np.max(tmp, axis=1), axis=1)))
     print("Perturbation min: " + str(np.min(np.min(tmp, axis=1), axis=1)))
 
-def is_score(asm, perturbation, nu=0.01):
+def is_score(asm, perturbation, nu=90):
     B_asm = asm.copy()
-    B_asm[B_asm < nu] = 0
-    B_asm[B_asm >= nu] = 1
-    numer = np.linalg.norm(B_asm * perturbation)
+    thresh = np.percentile(B_asm, nu)
+    print(thresh)
+    B_asm[B_asm < thresh] = 0
+    B_asm[B_asm >= thresh] = 1
+    B_asm_perturb = B_asm * perturbation
+    numer = np.linalg.norm(B_asm_perturb)
     denom = np.linalg.norm(perturbation)
-    return numer/denom
+    return numer/denom, B_asm_perturb.reshape((1, 84, 84, 4))
 
 def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack, m_target, m_adv, craft_asm):
         num_episodes = 0
@@ -227,10 +230,10 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                                     max_val = np.max(scaled_img_map[:,:,:,frame])
                                     img = scaled_img_map[:,:,:,frame]/max_val
                                     scaled_img_map[:,:,:,frame] = img*255
-                                interpretability = is_score(adv_map, adv_perturbation.reshape((84*84*4)), nu=0.001)
+                                interpretability, perturb_map = is_score(adv_map, adv_perturbation.reshape((84*84*4)), nu=99)
                                 print("Interpretability Score: {}".format(interpretability))
                                 is_record.append(interpretability)
-                                # img_stats(scaled_img_map*255,True)
+                                # img_stats(perturb_map, True)
                                 print("************************")
                                 # quit()
                 else:
