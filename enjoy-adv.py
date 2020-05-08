@@ -185,7 +185,7 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
         #video_recorder = VideoRecorder(
         #	env, video_path, enabled=video_path is not None)
         obs = env.reset()
-        is_record = []
+        is_record = [[] for i in range(9)]
         orig_frames = []
         basm_map_frames = []
         adv_frames = []
@@ -209,7 +209,7 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                         max_q = max(q_vals)
                         min_q = min(q_vals)
                         diff = max_q - min_q
-                        thresh = 0.1
+                        thresh = 0.05
                         if diff < thresh:
                             action = act(np.array(obs)[None], stochastic=stochastic)[0]
                             for i in range(4):
@@ -249,9 +249,10 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                                     np.array(obs)[None],
                                     stochastic_adv=stochastic,
                                 )
-                                interpretability, perturb_map = is_score(adv_map, adv_perturbation.reshape((84*84*4)), nu=nu)
-                                print("Interpretability Score: {}".format(interpretability))
-                                is_record.append(interpretability)
+                                for i in range(1,10):
+                                    interpretability, perturb_map = is_score(adv_map, adv_perturbation.reshape((84*84*4)), nu=i*10)
+                                    print("Interpretability{} Score: {}".format(i, interpretability))
+                                    is_record[i-1].append(interpretability)
                                 t_attack.append(num_moves)
                                 prefs.append(diff)
                                 for i in range(4):
@@ -291,14 +292,16 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                             print("Writing video....")
                             vd.write_video(orig_frames, basm_map_frames)
                             print("Done")
-                        if len(is_record) > 0:
-                            scaled_prefs = np.array(prefs)
-                            scaled_prefs = scaled_prefs/np.max(scaled_prefs)
-                            print(is_record)
-                            print(prefs)
-                            print(scaled_prefs)
-                            print("Avg interp: {}".format(np.mean(is_record)))
-                            print("Pref weighted interp: {}".format(np.mean(np.multiply(is_record, scaled_prefs))))
+                        for i in range(10):
+                            is_tmp = is_record[i-1]
+                            if len(is_tmp) > 0:
+                                scaled_prefs = np.array(prefs)
+                                scaled_prefs = scaled_prefs/np.max(scaled_prefs)
+                                print(is_tmp)
+                                print(prefs)
+                                print(scaled_prefs)
+                                print("Avg interp{}: {}".format(i, np.mean(is_tmp)))
+                                print("Pref weighted interp{}: {}".format(i, np.mean(np.multiply(is_tmp, scaled_prefs))))
                         if len(t_attack) > 2:
                             # print("Times attacked: {}".format(t_attack))
                             attack_gaps = [j-i for i, j in zip(t_attack[:-1], t_attack[1:])]
