@@ -31,6 +31,7 @@ import os
 import numpy as np
 from scipy.special import softmax
 
+import video as vd
 #from gym.monitoring import VideoRecorder
 from gym import wrappers
 from time import time
@@ -160,12 +161,15 @@ def perturbation_stats(adv, scale=1.0):
     print("Perturbation max: " + str(np.max(np.max(tmp, axis=1), axis=1)))
     print("Perturbation min: " + str(np.min(np.min(tmp, axis=1), axis=1)))
 
-def is_score(asm, perturbation, nu=90):
+def is_score(asm, perturbation, nu=50):
     B_asm = asm.copy()
-    thresh = np.percentile(B_asm, nu)
-    print(thresh)
-    B_asm[B_asm < thresh] = 0
-    B_asm[B_asm >= thresh] = 1
+    # uniq = np.unique(B_asm)
+    thresh = np.percentile(B_asm[B_asm.nonzero()], nu)
+    # print(np.sum(B_asm))
+    print("ASM Threshold: {}".format(thresh))
+    B_asm[B_asm <= thresh] = 0
+    B_asm[B_asm > thresh] = 1
+    # print(np.sum(B_asm))
     B_asm_perturb = np.multiply(B_asm, perturbation)
     numer = np.linalg.norm(B_asm_perturb)
     denom = np.linalg.norm(perturbation)
@@ -182,15 +186,23 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
         #	env, video_path, enabled=video_path is not None)
         obs = env.reset()
         is_record = []
+        orig_frames = []
+        basm_map_frames = []
+        adv_frames = []
         while True:
                 env.unwrapped.render()
                 #video_recorder.capture_frame()
                 num_moves += 1
 
+                # VIDEO RECORDING FRAMES
+                np_obs = np.array(obs)[None]
+                for i in range(4):
+                    orig_frames.append(np_obs[0,:,:,i])
                 #V: Attack #
                 if attack != None:
                         # Craft adv. examples
                         # STRATEGICALLY TIMED ATTACK
+
                         q_vals = softmax(m_target.q_val(np.array(obs)[None], stochastic=stochastic)[0])
                         max_q = max(q_vals)
                         min_q = min(q_vals)
@@ -198,8 +210,12 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                         thresh = 0
                         if diff < thresh:
                             action = act(np.array(obs)[None], stochastic=stochastic)[0]
+                            for i in range(4):
+                                basm_map_frames.append(np.zeros(shape=(84, 84)))
+
 
                         else:
+                            print("*******************")
                             num_attacks += 1
                             with m_adv.get_session().as_default():
                                 adv_obs = craft_adv_obs(np.array(obs)[None], stochastic_adv=stochastic)[0]
@@ -213,30 +229,24 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                                 np_adv = np.array(adv_obs)[None]
                                 np_obs = np.array(obs)[None]
                                 adv_perturbation = np_adv - np_obs
-                                print(adv_perturbation)
-                                print("Original:")
+                                # print("Original:")
                                 # img_stats(np_obs, True)
-                                print("Adversarial:")
+                                # print("Adversarial:")
                                 # img_stats(np_adv, True)
                                 # img_stats(adv_perturbation,True)
                                 perturbation_stats(adv_perturbation)
-                                print(">")
-                                print("************************\n CREATING MAP \n ")
+                                # print(">")
+                                # print("************************\n CREATING MAP \n ")
                                 adv_map = craft_asm(
                                     np.array(obs)[None],
                                     stochastic_adv=stochastic,
                                 )
-                                scaled_img_map = adv_map.copy().reshape((1,84,84,4))
-                                for frame in range(4):
-                                    max_val = np.max(scaled_img_map[:,:,:,frame])
-                                    img = scaled_img_map[:,:,:,frame]/max_val
-                                    scaled_img_map[:,:,:,frame] = img*255
                                 interpretability, perturb_map = is_score(adv_map, adv_perturbation.reshape((84*84*4)), nu=nu)
                                 print("Interpretability Score: {}".format(interpretability))
                                 is_record.append(interpretability)
-                                # img_stats(perturb_map, True)
-                                print("************************")
-                                # quit()
+                                for i in range(4):
+                                    basm_map_frames.append(perturb_map[0,:,:,i])
+                                print("*******************")
                 else:
                         # Normal
                         action = act(np.array(obs)[None], stochastic=stochastic)[0]
@@ -267,9 +277,12 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                         num_moves = 0
                         num_transfer = 0
                         num_attacks = 0
+                        print("Writing video....")
+                        vd.write_video(orig_frames, basm_map_frames)
+                        print("Done")
                         if len(is_record) > 0:
-                            print("Avg interp: {}".format(np.mean(is_record)))
                             print(is_record)
+                            print("Avg interp: {}".format(np.mean(is_record)))
                         return
 
 

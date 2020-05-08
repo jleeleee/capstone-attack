@@ -3,7 +3,7 @@ gym/
 baselines/
 cleverhans/
 videos/
-
+*.mp4
 *.swp
 *.pyc
 *.py~

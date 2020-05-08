@@ -512,7 +512,7 @@ def build_map(make_obs_tf, q_func, num_actions, epsilon, noisy, output_shape):
 
         def print_true(gt):
             result = gt.copy()
-            print("Result: " + str(result[0]))
+            # print("Result: " + str(result[0]))
             return result
 
         preds_max = reduce_max(preds, 1, keepdims=True)
