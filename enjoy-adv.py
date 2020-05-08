@@ -124,6 +124,7 @@ def parse_args():
     parser.add_argument("--video", type=str, default=None, help="Path to mp4 file where the video of first episode will be recorded.")
     boolean_flag(parser, "stochastic", default=True, help="whether or not to use stochastic actions according to models eps value")
     boolean_flag(parser, "dueling", default=False, help="whether or not to use dueling model")
+    boolean_flag(parser, "advvid", default=False, help="whether or not to create adv video")
     #V: Attack Arguments#
     parser.add_argument("--model-dir2", type=str, default=None, help="load adversarial model from this directory (blackbox attacks). ")
     parser.add_argument("--attack", type=str, default=None, help="Method to attack the model.")
@@ -172,7 +173,7 @@ def is_score(asm, perturbation, nu=50):
     denom = np.linalg.norm(perturbation)
     return numer/denom, B_asm_perturb.reshape((1, 84, 84, 4))
 
-def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack, m_target, m_adv, craft_asm, nu):
+def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack, m_target, m_adv, craft_asm, nu=50, adv_vid=False):
         num_moves = 0
         num_episodes = 0
         num_attacks = 0
@@ -280,9 +281,10 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                         num_moves = 0
                         num_transfer = 0
                         num_attacks = 0
-                        print("Writing video....")
-                        vd.write_video(orig_frames, basm_map_frames)
-                        print("Done")
+                        if adv_vid:
+                            print("Writing video....")
+                            vd.write_video(orig_frames, basm_map_frames)
+                            print("Done")
                         if len(is_record) > 0:
                             print(is_record)
                             print("Avg interp: {}".format(np.mean(is_record)))
@@ -310,4 +312,4 @@ if __name__ == '__main__':
             craft_adv_obs = m1.craft_adv()
             if args.nu is None:
                 args.nu = 90
-            play(env, m1.get_act(), craft_adv_obs, None, args.stochastic, args.video, args.attack, m1, m1, craft_asm, args.nu)
+            play(env, m1.get_act(), craft_adv_obs, None, args.stochastic, args.video, args.attack, m1, m1, craft_asm, args.nu, args.advvid)
