@@ -129,6 +129,7 @@ def parse_args():
     parser.add_argument("--model-dir2", type=str, default=None, help="load adversarial model from this directory (blackbox attacks). ")
     parser.add_argument("--attack", type=str, default=None, help="Method to attack the model.")
     parser.add_argument("--nu", type=int, default=50, help="Percentile of ASM.")
+    parser.add_argument("--beta", type=float, default=0.05, help="Percentile of ASM.")
     boolean_flag(parser, "noisy", default=False, help="whether or not to NoisyNetwork")
     boolean_flag(parser, "noisy2", default=False, help="whether or not to NoisyNetwork")
     boolean_flag(parser, "blackbox", default=False, help="whether or not to NoisyNetwork")
@@ -175,7 +176,7 @@ def is_score(asm, perturbation, nu=50):
     denom = np.linalg.norm(perturbation)
     return numer/denom, B_asm_perturb.reshape((1, 84, 84, 4))
 
-def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack, m_target, m_adv, craft_asm, nu=50, adv_vid=False):
+def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack, m_target, m_adv, craft_asm, nu=50, adv_vid=False, beta=0.05):
         num_moves = 0
         num_episodes = 0
         num_attacks = 0
@@ -192,7 +193,7 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
         t_attack = []
         prefs = []
         while True:
-                env.unwrapped.render()
+                # env.unwrapped.render()
                 #video_recorder.capture_frame()
                 num_moves += 1
 
@@ -209,7 +210,7 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                         max_q = max(q_vals)
                         min_q = min(q_vals)
                         diff = max_q - min_q
-                        thresh = 0.05
+                        thresh = beta
                         if diff < thresh:
                             action = act(np.array(obs)[None], stochastic=stochastic)[0]
                             for i in range(4):
@@ -330,4 +331,5 @@ if __name__ == '__main__':
             craft_adv_obs = m1.craft_adv()
             if args.nu is None:
                 args.nu = 90
-            play(env, m1.get_act(), craft_adv_obs, None, args.stochastic, args.video, args.attack, m1, m1, craft_asm, args.nu, args.advvid)
+            play(env, m1.get_act(), craft_adv_obs, None, args.stochastic, args.video, args.attack, m1, m1, craft_asm, args.nu, args.advvid, args.beta)
+
