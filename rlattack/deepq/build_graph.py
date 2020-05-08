@@ -145,10 +145,10 @@ def build_act_enjoy (make_obs_ph, q_func, num_actions, noisy=False, scope="deepq
                 def wrapper(x):
                     return q_func(x, num_actions, scope="q_func", reuse=True)
                 adversary = StrAttackL2(CallableModelWrapper(wrapper, 'logits'), sess=U.get_session())
-                str_params = {'binary_search_steps': 1,
+                str_params = {'binary_search_steps': 8,
                              'max_iterations': 100,
                              'learning_rate': 0.1,
-                             'initial_const': 10}
+                             'initial_const': 1}
                 adv_observations = adversary.generate(observations_ph.get(), **str_params) * 255.0
 
             craft_adv_obs = U.function(inputs=[observations_ph, stochastic_ph, update_eps_ph],
@@ -219,7 +219,7 @@ def build_adv(make_obs_tf, q_func, num_actions, epsilon, noisy, attack='fgsm'):
                          'max_iterations': 100,
                          'learning_rate': 0.1,
                          'initial_const': 10,
-                         #'y_target': y_target,
+                         'y_target': y_target,
                          'clip_min': 0,
                          'clip_max': 1.0}
             adv_observations = adversary.generate(obs_tf_in.get(), **cw_params) * 255.0
