@@ -126,6 +126,7 @@ def parse_args():
     #V: Attack Arguments#
     parser.add_argument("--model-dir2", type=str, default=None, help="load adversarial model from this directory (blackbox attacks). ")
     parser.add_argument("--attack", type=str, default=None, help="Method to attack the model.")
+    parser.add_argument("--nu", type=int, default=None, help="Percentile of ASM.")
     boolean_flag(parser, "noisy", default=False, help="whether or not to NoisyNetwork")
     boolean_flag(parser, "noisy2", default=False, help="whether or not to NoisyNetwork")
     boolean_flag(parser, "blackbox", default=False, help="whether or not to NoisyNetwork")
@@ -165,12 +166,12 @@ def is_score(asm, perturbation, nu=90):
     print(thresh)
     B_asm[B_asm < thresh] = 0
     B_asm[B_asm >= thresh] = 1
-    B_asm_perturb = B_asm * perturbation
+    B_asm_perturb = np.multiply(B_asm, perturbation)
     numer = np.linalg.norm(B_asm_perturb)
     denom = np.linalg.norm(perturbation)
     return numer/denom, B_asm_perturb.reshape((1, 84, 84, 4))
 
-def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack, m_target, m_adv, craft_asm):
+def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack, m_target, m_adv, craft_asm, nu):
         num_episodes = 0
         num_moves = 0
         num_attacks = 0
@@ -217,7 +218,7 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                                 # img_stats(np_obs, True)
                                 print("Adversarial:")
                                 # img_stats(np_adv, True)
-                                img_stats(adv_perturbation,True)
+                                # img_stats(adv_perturbation,True)
                                 perturbation_stats(adv_perturbation)
                                 print(">")
                                 print("************************\n CREATING MAP \n ")
@@ -230,7 +231,7 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
                                     max_val = np.max(scaled_img_map[:,:,:,frame])
                                     img = scaled_img_map[:,:,:,frame]/max_val
                                     scaled_img_map[:,:,:,frame] = img*255
-                                interpretability, perturb_map = is_score(adv_map, adv_perturbation.reshape((84*84*4)), nu=99)
+                                interpretability, perturb_map = is_score(adv_map, adv_perturbation.reshape((84*84*4)), nu=nu)
                                 print("Interpretability Score: {}".format(interpretability))
                                 is_record.append(interpretability)
                                 # img_stats(perturb_map, True)
@@ -291,4 +292,4 @@ if __name__ == '__main__':
         with m1.get_session().as_default():
             craft_asm = m1.craft_map()
             craft_adv_obs = m1.craft_adv()
-            play(env, m1.get_act(), craft_adv_obs, None, args.stochastic, args.video, args.attack, m1, m1, craft_asm)
+            play(env, m1.get_act(), craft_adv_obs, None, args.stochastic, args.video, args.attack, m1, m1, craft_asm, args.nu)
