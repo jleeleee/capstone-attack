@@ -155,10 +155,12 @@ def img_stats(img, show=False):
 
 
 
-def perturbation_stats(adv, scale=1.0):
+def perturbation_stats(adv, scale=255.0):
     tmp = adv/scale
     l2 = np.linalg.norm(tmp, axis=(1,2))
+    overall_l2 = np.linalg.norm(tmp)
     print("Perturbation l2: " + str(l2))
+    print("Overall l2: " + str(overall_l2))
     print("Perturbation max: " + str(np.max(np.max(tmp, axis=1), axis=1)))
     print("Perturbation min: " + str(np.min(np.min(tmp, axis=1), axis=1)))
 

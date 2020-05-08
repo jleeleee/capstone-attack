@@ -513,7 +513,7 @@ class LADMMSTL2:
             lower_bound = np.zeros(batch_size)
             CONST = np.ones(batch_size) * 5 # 5 for imgnet
             upper_bound = np.ones(batch_size)*1e10
-            for tmpi in range(8):
+            for tmpi in range(1):
                 #print("retrain C:", CONST)
                 bestl2 = [1e10]*batch_size
                 bestscore = [-1]*batch_size
